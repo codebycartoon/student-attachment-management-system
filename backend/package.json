@@ -9,6 +9,9 @@
     "init-db": "node src/scripts/initDb.js",
     "seed-data": "node src/scripts/seedData.js",
     "setup": "npm run create-db && npm run init-db && npm run seed-data",
+    "deploy-setup": "npm run init-db && npm run seed-data",
+    "deploy-init": "node src/scripts/deployInit.js",
+    "build": "echo 'Build completed'",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [
