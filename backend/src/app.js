@@ -10,6 +10,8 @@ const PORT = process.env.PORT || 5000;
 
 // Import routes
 const authRoutes = require('./routes/auth');
+const opportunityRoutes = require('./routes/opportunities');
+const applicationRoutes = require('./routes/applications');
 
 // Middleware
 app.use(cors());
@@ -24,6 +26,8 @@ app.get('/', (req, res) => {
     status: 'Running',
     endpoints: {
       auth: '/auth',
+      opportunities: '/opportunities',
+      applications: '/applications',
       health: '/health'
     }
   });
@@ -40,6 +44,8 @@ app.get('/health', (req, res) => {
 
 // API Routes
 app.use('/auth', authRoutes);
+app.use('/opportunities', opportunityRoutes);
+app.use('/applications', applicationRoutes);
 
 // 404 handler - must come after all routes
 app.all('*', (req, res) => {
