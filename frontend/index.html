@@ -134,6 +134,8 @@
 
         // Check API status on load
         window.onload = function() {
+            console.log('Current hostname:', window.location.hostname);
+            console.log('API_BASE set to:', API_BASE);
             checkApiStatus();
         };
 
@@ -147,6 +149,8 @@
                 .catch(error => {
                     statusElement.textContent = '❌ API not running. Please check deployment.';
                     statusElement.className = 'text-red-600 font-bold';
+                    console.log('API Base URL:', API_BASE);
+                    console.log('Full URL tried:', `${API_BASE}/health`);
                 });
         }
 
