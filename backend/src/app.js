@@ -67,6 +67,64 @@ app.get('/setup', async (req, res) => {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
+
+    // Create students table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS students (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        registration_number VARCHAR(100) UNIQUE NOT NULL,
+        course VARCHAR(255) NOT NULL,
+        year INTEGER NOT NULL,
+        phone VARCHAR(20),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Create companies table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS companies (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        company_name VARCHAR(255) NOT NULL,
+        industry VARCHAR(255),
+        location VARCHAR(255),
+        description TEXT,
+        website VARCHAR(255),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Create opportunities table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS opportunities (
+        id SERIAL PRIMARY KEY,
+        company_id INTEGER REFERENCES companies(id) ON DELETE CASCADE,
+        title VARCHAR(255) NOT NULL,
+        description TEXT NOT NULL,
+        requirements TEXT,
+        slots INTEGER DEFAULT 1,
+        deadline DATE NOT NULL,
+        location VARCHAR(255),
+        duration_months INTEGER DEFAULT 3,
+        is_active BOOLEAN DEFAULT true,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Create applications table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS applications (
+        id SERIAL PRIMARY KEY,
+        student_id INTEGER REFERENCES students(id) ON DELETE CASCADE,
+        opportunity_id INTEGER REFERENCES opportunities(id) ON DELETE CASCADE,
+        status VARCHAR(50) CHECK (status IN ('pending', 'accepted', 'rejected', 'placed')) DEFAULT 'pending',
+        cover_letter TEXT,
+        applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(student_id, opportunity_id)
+      )
+    `);
     
     // Create admin user
     const adminCheck = await pool.query('SELECT id FROM users WHERE email = $1', ['admin@system.com']);
@@ -80,32 +138,60 @@ app.get('/setup', async (req, res) => {
     
     // Create student user
     const studentCheck = await pool.query('SELECT id FROM users WHERE email = $1', ['student@university.edu']);
+    let studentUserId;
     if (studentCheck.rows.length === 0) {
       const hashedPassword = await bcrypt.hash('student123', 10);
-      await pool.query(
-        'INSERT INTO users (name, email, password, role) VALUES ($1, $2, $3, $4)',
+      const result = await pool.query(
+        'INSERT INTO users (name, email, password, role) VALUES ($1, $2, $3, $4) RETURNING id',
         ['John Doe', 'student@university.edu', hashedPassword, 'student']
+      );
+      studentUserId = result.rows[0].id;
+    } else {
+      studentUserId = studentCheck.rows[0].id;
+    }
+    
+    // Create student profile
+    const studentProfileCheck = await pool.query('SELECT id FROM students WHERE user_id = $1', [studentUserId]);
+    if (studentProfileCheck.rows.length === 0) {
+      await pool.query(
+        'INSERT INTO students (user_id, registration_number, course, year, phone) VALUES ($1, $2, $3, $4, $5)',
+        [studentUserId, 'STU2024001', 'Computer Science', 3, '+1234567890']
       );
     }
     
     // Create company user
     const companyCheck = await pool.query('SELECT id FROM users WHERE email = $1', ['company@techcorp.com']);
+    let companyUserId;
     if (companyCheck.rows.length === 0) {
       const hashedPassword = await bcrypt.hash('company123', 10);
-      await pool.query(
-        'INSERT INTO users (name, email, password, role) VALUES ($1, $2, $3, $4)',
+      const result = await pool.query(
+        'INSERT INTO users (name, email, password, role) VALUES ($1, $2, $3, $4) RETURNING id',
         ['TechCorp Solutions', 'company@techcorp.com', hashedPassword, 'company']
+      );
+      companyUserId = result.rows[0].id;
+    } else {
+      companyUserId = companyCheck.rows[0].id;
+    }
+    
+    // Create company profile
+    const companyProfileCheck = await pool.query('SELECT id FROM companies WHERE user_id = $1', [companyUserId]);
+    if (companyProfileCheck.rows.length === 0) {
+      await pool.query(
+        'INSERT INTO companies (user_id, company_name, industry, location, description, website) VALUES ($1, $2, $3, $4, $5, $6)',
+        [companyUserId, 'TechCorp Solutions', 'Technology', 'San Francisco, CA', 'Leading technology solutions provider', 'https://techcorp.com']
       );
     }
     
     res.json({
       success: true,
-      message: 'Database setup complete!',
+      message: 'Complete database setup finished!',
+      tables: ['users', 'students', 'companies', 'opportunities', 'applications'],
       accounts: [
         'admin@system.com / admin123',
         'student@university.edu / student123', 
         'company@techcorp.com / company123'
-      ]
+      ],
+      note: 'Admin dashboard should now work properly!'
     });
     
   } catch (error) {
