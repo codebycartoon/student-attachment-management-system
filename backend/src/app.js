@@ -45,16 +45,30 @@ app.get('/health', (req, res) => {
 });
 
 // Database initialization endpoint
-app.get('/init-db', async (req, res) => {
+app.get('/setup', async (req, res) => {
   try {
-    const { initializeTables } = require('./config/database');
-    await initializeTables();
-    
-    // Create test users if they don't exist
     const bcrypt = require('bcryptjs');
-    const { pool } = require('./config/database');
+    const { Pool } = require('pg');
     
-    // Admin user
+    // Create database connection
+    const pool = new Pool({
+      connectionString: process.env.DATABASE_URL,
+      ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+    });
+    
+    // Create users table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS users (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        email VARCHAR(255) UNIQUE NOT NULL,
+        password VARCHAR(255) NOT NULL,
+        role VARCHAR(50) CHECK (role IN ('student', 'company', 'admin')) NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    
+    // Create admin user
     const adminCheck = await pool.query('SELECT id FROM users WHERE email = $1', ['admin@system.com']);
     if (adminCheck.rows.length === 0) {
       const hashedPassword = await bcrypt.hash('admin123', 10);
@@ -64,7 +78,7 @@ app.get('/init-db', async (req, res) => {
       );
     }
     
-    // Student user
+    // Create student user
     const studentCheck = await pool.query('SELECT id FROM users WHERE email = $1', ['student@university.edu']);
     if (studentCheck.rows.length === 0) {
       const hashedPassword = await bcrypt.hash('student123', 10);
@@ -74,7 +88,7 @@ app.get('/init-db', async (req, res) => {
       );
     }
     
-    // Company user
+    // Create company user
     const companyCheck = await pool.query('SELECT id FROM users WHERE email = $1', ['company@techcorp.com']);
     if (companyCheck.rows.length === 0) {
       const hashedPassword = await bcrypt.hash('company123', 10);
@@ -85,20 +99,20 @@ app.get('/init-db', async (req, res) => {
     }
     
     res.json({
-      message: 'Database initialized successfully',
-      tables: 'Created',
-      users: 'Test users created',
+      success: true,
+      message: 'Database setup complete!',
       accounts: [
         'admin@system.com / admin123',
-        'student@university.edu / student123',
+        'student@university.edu / student123', 
         'company@techcorp.com / company123'
       ]
     });
     
   } catch (error) {
-    console.error('Database initialization error:', error);
+    console.error('Setup error:', error);
     res.status(500).json({
-      message: 'Database initialization failed',
+      success: false,
+      message: 'Setup failed',
       error: error.message
     });
   }
