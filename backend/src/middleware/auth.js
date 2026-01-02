@@ -86,7 +86,7 @@ const authorizeRole = (...roles) => {
 };
 
 // Middleware to check if user is admin
-const requireAdmin = authorizeRole('admin');
+const requireAdmin = [authenticateToken, authorizeRole('admin')];
 
 // Middleware to check if user is company
 const requireCompany = [authenticateToken, enrichUserData, authorizeRole('company')];

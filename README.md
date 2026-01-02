@@ -37,6 +37,15 @@ Our system provides a centralized platform where:
 - Application status tracking
 - Admin approval workflows
 
+### 📊 Admin Dashboard Features
+- **System-wide analytics and KPIs** - Real-time metrics and performance indicators
+- **User and company performance metrics** - Detailed analytics on user activity and success rates
+- **Application success rates and trends** - Track placement outcomes and application flow
+- **Industry and location-based insights** - Geographic and sector analysis
+- **Data export capabilities** - JSON and CSV export for reporting
+- **System health and monitoring** - Database performance and integrity checks
+- **User management tools** - Administrative oversight and account management
+
 ### 📊 Analytics & Reporting
 - Placement statistics and metrics
 - Application tracking and history
@@ -67,10 +76,49 @@ POST   /auth/login        - User authentication
 GET    /auth/profile      - Get user profile
 PUT    /auth/profile      - Update profile
 
+Opportunities:
+GET    /opportunities/active              - Browse active opportunities
+GET    /opportunities/search              - Search opportunities
+GET    /opportunities/:id                 - Get opportunity details
+POST   /opportunities                     - Create opportunity (Company)
+GET    /opportunities/company/my          - Get company opportunities
+PUT    /opportunities/:id                 - Update opportunity (Company)
+PATCH  /opportunities/:id/close           - Close opportunity (Company)
+
+Applications:
+POST   /applications                      - Submit application (Student)
+GET    /applications/my                   - Get student applications
+GET    /applications/opportunity/:id      - Get opportunity applications (Company)
+PATCH  /applications/:id/opportunity/:id/status - Update application status (Company)
+DELETE /applications/:id                 - Withdraw application (Student)
+
+Admin Dashboard:
+GET    /admin/dashboard/stats             - System statistics
+GET    /admin/dashboard/summary           - Analytics summary
+GET    /admin/analytics/users/activity    - User activity trends
+GET    /admin/analytics/companies/top     - Top performing companies
+GET    /admin/analytics/companies/industry - Industry analytics
+GET    /admin/system/health               - System health monitoring
+GET    /admin/export/:type                - Data export (JSON/CSV)
+
 System:
 GET    /                  - API information
 GET    /health           - Health check
 ```
+
+## 🚧 Development Status
+
+- [x] **Phase 1**: Authentication & User Management ✅
+- [x] **Phase 1**: Database Schema & Models ✅  
+- [x] **Phase 1**: API Foundation & Security ✅
+- [x] **Phase 2**: Opportunity Management System ✅
+- [x] **Phase 2**: Application Workflow ✅
+- [x] **Phase 2**: Role-based Access Control ✅
+- [x] **Phase 3**: Admin Dashboard & Analytics ✅
+- [x] **Phase 3**: System Health Monitoring ✅
+- [x] **Phase 3**: Data Export & Reporting ✅
+- [ ] **Phase 4**: Frontend Interface (React)
+- [ ] **Phase 5**: Production Deployment & Testing
 
 ## 🚀 Quick Start
 
