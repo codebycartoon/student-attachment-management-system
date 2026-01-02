@@ -44,6 +44,66 @@ app.get('/health', (req, res) => {
   });
 });
 
+// Database initialization endpoint
+app.get('/init-db', async (req, res) => {
+  try {
+    const { initializeTables } = require('./config/database');
+    await initializeTables();
+    
+    // Create test users if they don't exist
+    const bcrypt = require('bcryptjs');
+    const { pool } = require('./config/database');
+    
+    // Admin user
+    const adminCheck = await pool.query('SELECT id FROM users WHERE email = $1', ['admin@system.com']);
+    if (adminCheck.rows.length === 0) {
+      const hashedPassword = await bcrypt.hash('admin123', 10);
+      await pool.query(
+        'INSERT INTO users (name, email, password, role) VALUES ($1, $2, $3, $4)',
+        ['System Administrator', 'admin@system.com', hashedPassword, 'admin']
+      );
+    }
+    
+    // Student user
+    const studentCheck = await pool.query('SELECT id FROM users WHERE email = $1', ['student@university.edu']);
+    if (studentCheck.rows.length === 0) {
+      const hashedPassword = await bcrypt.hash('student123', 10);
+      await pool.query(
+        'INSERT INTO users (name, email, password, role) VALUES ($1, $2, $3, $4)',
+        ['John Doe', 'student@university.edu', hashedPassword, 'student']
+      );
+    }
+    
+    // Company user
+    const companyCheck = await pool.query('SELECT id FROM users WHERE email = $1', ['company@techcorp.com']);
+    if (companyCheck.rows.length === 0) {
+      const hashedPassword = await bcrypt.hash('company123', 10);
+      await pool.query(
+        'INSERT INTO users (name, email, password, role) VALUES ($1, $2, $3, $4)',
+        ['TechCorp Solutions', 'company@techcorp.com', hashedPassword, 'company']
+      );
+    }
+    
+    res.json({
+      message: 'Database initialized successfully',
+      tables: 'Created',
+      users: 'Test users created',
+      accounts: [
+        'admin@system.com / admin123',
+        'student@university.edu / student123',
+        'company@techcorp.com / company123'
+      ]
+    });
+    
+  } catch (error) {
+    console.error('Database initialization error:', error);
+    res.status(500).json({
+      message: 'Database initialization failed',
+      error: error.message
+    });
+  }
+});
+
 // API Routes
 app.use('/auth', authRoutes);
 app.use('/opportunities', opportunityRoutes);
