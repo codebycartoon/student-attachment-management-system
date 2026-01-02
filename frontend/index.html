@@ -128,7 +128,7 @@
         // Auto-detect API base URL
         const API_BASE = window.location.hostname === 'localhost' 
             ? 'http://localhost:5000' 
-            : window.location.origin;
+            : window.location.origin + '/.netlify/functions/server';
         
         let currentToken = '';
 

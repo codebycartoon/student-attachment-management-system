@@ -1,6 +1,6 @@
 [build]
   command = "cd backend && npm install"
-  functions = "backend/src"
+  functions = "netlify/functions"
   publish = "frontend"
 
 [build.environment]
@@ -8,13 +8,10 @@
 
 [[redirects]]
   from = "/api/*"
-  to = "/.netlify/functions/app/:splat"
+  to = "/.netlify/functions/server/:splat"
   status = 200
 
 [[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
-
-[functions]
-  node_bundler = "esbuild"
