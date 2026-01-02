@@ -72,4 +72,5 @@ app.listen(PORT, () => {
   console.log(`📍 Environment: ${process.env.NODE_ENV || 'development'}`);
 });
 
+// Export app for serverless functions
 module.exports = app;
