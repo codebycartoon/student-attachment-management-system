@@ -1,0 +1,72 @@
+/* Global CSS Variables for White-Label Theming */
+:root {
+  --nav-height: 4rem;
+  --nav-bg: #ffffff;
+  --nav-text: #111;
+  --nav-accent: #0070f3;
+  --max-width: 1200px;
+  --transition: 0.25s ease;
+  
+  /* Hero Variables */
+  --hero-bg: #fafafa;
+  --hero-text: #111;
+  --hero-text-secondary: #444;
+  --card-bg: #ffffff;
+  --card-border: #e5e5e5;
+  --card-shadow: rgba(0, 0, 0, 0.04);
+}
+
+/* Global Resets */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: var(--nav-height);
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  background: var(--hero-bg);
+  color: var(--hero-text);
+  line-height: 1.6;
+}
+
+img,
+svg {
+  display: block;
+  max-width: 100%;
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+}
+
+/* Focus styles for accessibility */
+button:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--nav-accent);
+  outline-offset: 2px;
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

@@ -1,298 +1,59 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Student Attachment Management System</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
-</head>
-<body class="bg-gray-50 min-h-screen">
-    <div class="container mx-auto px-4 py-8">
-        <!-- Header -->
-        <header class="text-center mb-8">
-            <h1 class="text-4xl font-bold text-blue-600 mb-2">Student Attachment Management System</h1>
-            <p class="text-gray-600">Professional Backend API with Admin Dashboard</p>
-            <div class="mt-4 p-4 bg-green-100 rounded-lg">
-                <p class="text-green-800">✅ <strong>Backend API Running:</strong> <span id="api-status">Checking...</span></p>
-            </div>
-        </header>
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    
+    <!-- SEO Meta Tags -->
+    <title>AttachPro - Match Students to Industry Placements Automatically | 87% Success Rate</title>
+    <meta name="description" content="AttachPro helps universities place more students, faster, with AI-powered matching, structured workflows, and real-time analytics. 87% placement success rate." />
+    <meta name="keywords" content="student placement, industry attachments, university software, AI matching, career services, internship management" />
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://attachpro.com/" />
+    <meta property="og:title" content="AttachPro - Match Students to Industry Placements Automatically" />
+    <meta property="og:description" content="87% placement success • 3× faster matching • Trusted by leading universities" />
+    <meta property="og:image" content="https://attachpro.com/og-image.jpg" />
 
-        <!-- Navigation -->
-        <nav class="mb-8">
-            <div class="flex justify-center space-x-4">
-                <button onclick="showSection('demo')" class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">Live Demo</button>
-                <button onclick="showSection('features')" class="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600">Features</button>
-                <button onclick="showSection('api')" class="px-4 py-2 bg-purple-500 text-white rounded hover:bg-purple-600">API Testing</button>
-                <button onclick="showSection('admin')" class="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600">Admin Dashboard</button>
-            </div>
-        </nav>
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image" />
+    <meta property="twitter:url" content="https://attachpro.com/" />
+    <meta property="twitter:title" content="AttachPro - Match Students to Industry Placements Automatically" />
+    <meta property="twitter:description" content="87% placement success • 3× faster matching • Trusted by leading universities" />
+    <meta property="twitter:image" content="https://attachpro.com/twitter-image.jpg" />
 
-        <!-- Demo Section -->
-        <section id="demo" class="section">
-            <div class="grid md:grid-cols-3 gap-6">
-                <!-- Student Login -->
-                <div class="bg-white p-6 rounded-lg shadow">
-                    <h3 class="text-xl font-bold text-blue-600 mb-4">👨‍🎓 Student Portal</h3>
-                    <div class="space-y-3">
-                        <input type="email" id="student-email" placeholder="student@university.edu" class="w-full p-2 border rounded">
-                        <input type="password" id="student-password" placeholder="student123" class="w-full p-2 border rounded">
-                        <button onclick="loginStudent()" class="w-full bg-blue-500 text-white p-2 rounded hover:bg-blue-600">Login as Student</button>
-                    </div>
-                    <div id="student-result" class="mt-4 text-sm"></div>
-                </div>
-
-                <!-- Company Login -->
-                <div class="bg-white p-6 rounded-lg shadow">
-                    <h3 class="text-xl font-bold text-green-600 mb-4">🏢 Company Portal</h3>
-                    <div class="space-y-3">
-                        <input type="email" id="company-email" placeholder="company@techcorp.com" class="w-full p-2 border rounded">
-                        <input type="password" id="company-password" placeholder="company123" class="w-full p-2 border rounded">
-                        <button onclick="loginCompany()" class="w-full bg-green-500 text-white p-2 rounded hover:bg-green-600">Login as Company</button>
-                    </div>
-                    <div id="company-result" class="mt-4 text-sm"></div>
-                </div>
-
-                <!-- Admin Login -->
-                <div class="bg-white p-6 rounded-lg shadow">
-                    <h3 class="text-xl font-bold text-red-600 mb-4">🛡️ Admin Portal</h3>
-                    <div class="space-y-3">
-                        <input type="email" id="admin-email" placeholder="admin@system.com" class="w-full p-2 border rounded">
-                        <input type="password" id="admin-password" placeholder="admin123" class="w-full p-2 border rounded">
-                        <button onclick="loginAdmin()" class="w-full bg-red-500 text-white p-2 rounded hover:bg-red-600">Login as Admin</button>
-                    </div>
-                    <div id="admin-result" class="mt-4 text-sm"></div>
-                </div>
-            </div>
-        </section>
-
-        <!-- Features Section -->
-        <section id="features" class="section hidden">
-            <div class="grid md:grid-cols-2 gap-8">
-                <div class="bg-white p-6 rounded-lg shadow">
-                    <h3 class="text-2xl font-bold mb-4">🚀 Backend Features</h3>
-                    <ul class="space-y-2">
-                        <li>✅ JWT Authentication & Authorization</li>
-                        <li>✅ Role-based Access Control</li>
-                        <li>✅ Complete CRUD Operations</li>
-                        <li>✅ PostgreSQL Database Integration</li>
-                        <li>✅ RESTful API Design</li>
-                        <li>✅ Professional Error Handling</li>
-                    </ul>
-                </div>
-                <div class="bg-white p-6 rounded-lg shadow">
-                    <h3 class="text-2xl font-bold mb-4">📊 Admin Dashboard</h3>
-                    <ul class="space-y-2">
-                        <li>✅ System Analytics & KPIs</li>
-                        <li>✅ User Management Tools</li>
-                        <li>✅ Application Tracking</li>
-                        <li>✅ Company Performance Metrics</li>
-                        <li>✅ Data Export (JSON/CSV)</li>
-                        <li>✅ System Health Monitoring</li>
-                    </ul>
-                </div>
-            </div>
-        </section>
-
-        <!-- API Testing Section -->
-        <section id="api" class="section hidden">
-            <div class="bg-white p-6 rounded-lg shadow">
-                <h3 class="text-2xl font-bold mb-4">🔧 API Testing</h3>
-                <div class="space-y-4">
-                    <button onclick="testHealth()" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">Test Health Endpoint</button>
-                    <button onclick="testOpportunities()" class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">Get Opportunities</button>
-                    <button onclick="testRegister()" class="bg-purple-500 text-white px-4 py-2 rounded hover:bg-purple-600">Test Registration</button>
-                </div>
-                <div id="api-results" class="mt-4 p-4 bg-gray-100 rounded text-sm font-mono max-h-96 overflow-y-auto"></div>
-            </div>
-        </section>
-
-        <!-- Admin Dashboard Section -->
-        <section id="admin" class="section hidden">
-            <div class="grid md:grid-cols-2 gap-6">
-                <div class="bg-white p-6 rounded-lg shadow">
-                    <h3 class="text-xl font-bold mb-4">📊 System Statistics</h3>
-                    <button onclick="getAdminStats()" class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 mb-4">Load Stats</button>
-                    <div id="admin-stats" class="text-sm"></div>
-                </div>
-                <div class="bg-white p-6 rounded-lg shadow">
-                    <h3 class="text-xl font-bold mb-4">👥 User Management</h3>
-                    <button onclick="getUsers()" class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 mb-4">Load Users</button>
-                    <div id="user-list" class="text-sm"></div>
-                </div>
-            </div>
-        </section>
-    </div>
-
-    <script>
-        // Auto-detect API base URL
-        const API_BASE = window.location.hostname === 'localhost' 
-            ? 'http://localhost:5000' 
-            : 'https://student-attachment-management-system.onrender.com';
-        
-        let currentToken = '';
-
-        // Check API status on load
-        window.onload = function() {
-            console.log('Current hostname:', window.location.hostname);
-            console.log('API_BASE set to:', API_BASE);
-            checkApiStatus();
-        };
-
-        function checkApiStatus() {
-            const statusElement = document.getElementById('api-status');
-            axios.get(`${API_BASE}/health`)
-                .then(response => {
-                    statusElement.textContent = `✅ Connected to ${API_BASE.replace('http://', '').replace('https://', '')}`;
-                    statusElement.className = 'text-green-600 font-bold';
-                })
-                .catch(error => {
-                    statusElement.textContent = '❌ API not running. Please check deployment.';
-                    statusElement.className = 'text-red-600 font-bold';
-                    console.log('API Base URL:', API_BASE);
-                    console.log('Full URL tried:', `${API_BASE}/health`);
-                });
-        }
-
-        function showSection(sectionName) {
-            // Hide all sections
-            document.querySelectorAll('.section').forEach(section => {
-                section.classList.add('hidden');
-            });
-            // Show selected section
-            document.getElementById(sectionName).classList.remove('hidden');
-        }
-
-        async function loginStudent() {
-            const email = document.getElementById('student-email').value || 'student@university.edu';
-            const password = document.getElementById('student-password').value || 'student123';
-            
-            try {
-                const response = await axios.post(`${API_BASE}/auth/login`, { email, password });
-                currentToken = response.data.token;
-                document.getElementById('student-result').innerHTML = `
-                    <div class="text-green-600">✅ Login successful!</div>
-                    <div class="text-sm mt-2">Welcome, ${response.data.user.name}</div>
-                    <button onclick="getMyApplications()" class="mt-2 bg-blue-500 text-white px-3 py-1 rounded text-xs">View My Applications</button>
-                `;
-            } catch (error) {
-                document.getElementById('student-result').innerHTML = `<div class="text-red-600">❌ ${error.response?.data?.message || 'Login failed'}</div>`;
-            }
-        }
-
-        async function loginCompany() {
-            const email = document.getElementById('company-email').value || 'company@techcorp.com';
-            const password = document.getElementById('company-password').value || 'company123';
-            
-            try {
-                const response = await axios.post(`${API_BASE}/auth/login`, { email, password });
-                currentToken = response.data.token;
-                document.getElementById('company-result').innerHTML = `
-                    <div class="text-green-600">✅ Login successful!</div>
-                    <div class="text-sm mt-2">Welcome, ${response.data.user.name}</div>
-                    <button onclick="getMyOpportunities()" class="mt-2 bg-green-500 text-white px-3 py-1 rounded text-xs">View My Opportunities</button>
-                `;
-            } catch (error) {
-                document.getElementById('company-result').innerHTML = `<div class="text-red-600">❌ ${error.response?.data?.message || 'Login failed'}</div>`;
-            }
-        }
-
-        async function loginAdmin() {
-            const email = document.getElementById('admin-email').value || 'admin@system.com';
-            const password = document.getElementById('admin-password').value || 'admin123';
-            
-            try {
-                const response = await axios.post(`${API_BASE}/auth/login`, { email, password });
-                currentToken = response.data.token;
-                document.getElementById('admin-result').innerHTML = `
-                    <div class="text-green-600">✅ Admin login successful!</div>
-                    <div class="text-sm mt-2">Welcome, ${response.data.user.name}</div>
-                    <button onclick="showSection('admin')" class="mt-2 bg-red-500 text-white px-3 py-1 rounded text-xs">Go to Admin Dashboard</button>
-                `;
-            } catch (error) {
-                document.getElementById('admin-result').innerHTML = `<div class="text-red-600">❌ ${error.response?.data?.message || 'Login failed'}</div>`;
-            }
-        }
-
-        async function testHealth() {
-            try {
-                const response = await axios.get(`${API_BASE}/health`);
-                document.getElementById('api-results').textContent = JSON.stringify(response.data, null, 2);
-            } catch (error) {
-                document.getElementById('api-results').textContent = `Error: ${error.message}`;
-            }
-        }
-
-        async function testOpportunities() {
-            try {
-                const response = await axios.get(`${API_BASE}/opportunities/active`);
-                document.getElementById('api-results').textContent = JSON.stringify(response.data, null, 2);
-            } catch (error) {
-                document.getElementById('api-results').textContent = `Error: ${error.message}`;
-            }
-        }
-
-        async function testRegister() {
-            try {
-                const response = await axios.post(`${API_BASE}/auth/register`, {
-                    name: 'Demo User',
-                    email: `demo${Date.now()}@example.com`,
-                    password: 'password123',
-                    role: 'student'
-                });
-                document.getElementById('api-results').textContent = JSON.stringify(response.data, null, 2);
-            } catch (error) {
-                document.getElementById('api-results').textContent = `Error: ${error.response?.data?.message || error.message}`;
-            }
-        }
-
-        async function getAdminStats() {
-            if (!currentToken) {
-                document.getElementById('admin-stats').innerHTML = '<div class="text-red-600">Please login as admin first</div>';
-                return;
-            }
-            
-            try {
-                const response = await axios.get(`${API_BASE}/admin/dashboard/stats`, {
-                    headers: { Authorization: `Bearer ${currentToken}` }
-                });
-                const stats = response.data.stats;
-                document.getElementById('admin-stats').innerHTML = `
-                    <div class="grid grid-cols-2 gap-2 text-xs">
-                        <div>👥 Total Users: <strong>${stats.total_users}</strong></div>
-                        <div>👨‍🎓 Students: <strong>${stats.total_students}</strong></div>
-                        <div>🏢 Companies: <strong>${stats.total_companies}</strong></div>
-                        <div>📋 Opportunities: <strong>${stats.total_opportunities}</strong></div>
-                        <div>📝 Applications: <strong>${stats.total_applications}</strong></div>
-                        <div>✅ Acceptance Rate: <strong>${stats.acceptance_rate}%</strong></div>
-                    </div>
-                `;
-            } catch (error) {
-                document.getElementById('admin-stats').innerHTML = `<div class="text-red-600">Error: ${error.response?.data?.message || error.message}</div>`;
-            }
-        }
-
-        async function getUsers() {
-            if (!currentToken) {
-                document.getElementById('user-list').innerHTML = '<div class="text-red-600">Please login as admin first</div>';
-                return;
-            }
-            
-            try {
-                const response = await axios.get(`${API_BASE}/admin/analytics/users/all`, {
-                    headers: { Authorization: `Bearer ${currentToken}` }
-                });
-                const users = response.data.users;
-                document.getElementById('user-list').innerHTML = users.map(user => `
-                    <div class="border-b py-2">
-                        <div class="font-bold">${user.name}</div>
-                        <div class="text-xs text-gray-600">${user.email} - ${user.role}</div>
-                    </div>
-                `).join('');
-            } catch (error) {
-                document.getElementById('user-list').innerHTML = `<div class="text-red-600">Error: ${error.response?.data?.message || error.message}</div>`;
-            }
-        }
+    <!-- Performance & Accessibility -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="dns-prefetch" href="https://fonts.googleapis.com" />
+    
+    <!-- Prevent layout shift -->
+    <style>
+      /* Critical CSS to prevent layout shift */
+      body { margin: 0; font-family: system-ui, sans-serif; }
+      .preloader { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #fff; z-index: 9999; }
+    </style>
+    
+    <!-- Schema.org structured data -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Organization",
+      "name": "AttachPro",
+      "url": "https://attachpro.com",
+      "logo": "https://attachpro.com/logo.png",
+      "description": "AI-powered student placement platform for universities",
+      "sameAs": [
+        "https://twitter.com/attachpro",
+        "https://linkedin.com/company/attachpro"
+      ]
+    }
     </script>
-</body>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
 </html>
