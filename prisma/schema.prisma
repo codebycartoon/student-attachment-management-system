@@ -1,0 +1,725 @@
+// Phase 2: Core Data Models & Admin APIs
+// Complete relational schema for student-company matching platform
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// ENUMS
+// ============================================================================
+
+enum UserRole {
+  STUDENT
+  COMPANY
+  ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  PENDING
+  INACTIVE
+}
+
+enum CompanyUserRole {
+  ADMIN
+  MANAGER
+  RECRUITER
+}
+
+enum ApplicationStatus {
+  SUBMITTED
+  IN_REVIEW
+  ACCEPTED
+  REJECTED
+  WITHDRAWN
+}
+
+enum InterviewType {
+  ONLINE
+  ONSITE
+  PHONE
+  VIDEO
+}
+
+enum InterviewStatus {
+  SCHEDULED
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+enum PlacementStatus {
+  ACTIVE
+  COMPLETED
+  CANCELLED
+  TERMINATED
+}
+
+enum OpportunityStatus {
+  ACTIVE
+  CLOSED
+  PENDING_APPROVAL
+  REJECTED
+  DRAFT
+}
+
+enum EmploymentType {
+  INTERNSHIP
+  PART_TIME
+  FULL_TIME
+  CONTRACT
+  FREELANCE
+}
+
+enum PreferenceType {
+  INDUSTRY
+  LOCATION
+  JOB_TYPE
+  COMPANY_SIZE
+  WORK_ENVIRONMENT
+}
+
+enum NotificationType {
+  APPLICATION_UPDATE
+  INTERVIEW_SCHEDULED
+  OPPORTUNITY_MATCH
+  SYSTEM_ALERT
+  PLACEMENT_UPDATE
+}
+
+enum QueueStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  RETRYING
+}
+
+enum LogLevel {
+  INFO
+  WARNING
+  ERROR
+  DEBUG
+}
+
+// ============================================================================
+// CORE USER MANAGEMENT
+// ============================================================================
+
+model User {
+  userId       String     @id @default(cuid())
+  email        String     @unique
+  passwordHash String
+  role         UserRole
+  status       UserStatus @default(ACTIVE)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  // Relationships
+  student        Student?
+  company        Company?
+  admin          Admin?
+  sessions       UserSession[]
+  notifications  Notification[]
+  systemLogs     SystemLog[]
+  companyUsers   CompanyUser[]
+
+  @@map("users")
+}
+
+// Phase 1: Minimal Profile Tables
+model Student {
+  studentId     String   @id @default(cuid())
+  userId        String   @unique
+  firstName     String
+  lastName      String
+  phone         String?
+  location      String?
+  linkedinUrl   String?
+  websiteUrl    String?
+  elevatorPitch String?
+  profilePicture String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relationships
+  user               User                @relation(fields: [userId], references: [userId], onDelete: Cascade)
+  profile            StudentProfile?
+  skills             StudentSkill[]
+  courses            StudentCourse[]
+  preferences        StudentPreference[]
+  experiences        Experience[]
+  projects           Project[]
+  applications       Application[]
+  metrics            StudentMetrics?
+  documents          StudentDocument[]
+
+  @@map("students")
+}
+
+model Company {
+  companyId   String   @id @default(cuid())
+  userId      String   @unique
+  companyName String
+  industry    String?
+  location    String?
+  website     String?
+  logoPath    String?
+  description String?  @db.Text
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relationships
+  user         User           @relation(fields: [userId], references: [userId], onDelete: Cascade)
+  profile      CompanyProfile?
+  companyUsers CompanyUser[]
+  opportunities Opportunity[]
+
+  @@map("companies")
+}
+
+model Admin {
+  adminId    String   @id @default(cuid())
+  userId     String   @unique
+  superAdmin Boolean  @default(false)
+  inviteCode String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  // Relationships
+  user User @relation(fields: [userId], references: [userId], onDelete: Cascade)
+
+  @@map("admins")
+}
+
+// Session Management
+model UserSession {
+  sessionId    String   @id @default(cuid())
+  userId       String
+  jwtToken     String   @unique
+  refreshToken String   @unique
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+
+  // Relationships
+  user User @relation(fields: [userId], references: [userId], onDelete: Cascade)
+
+  @@map("user_sessions")
+}
+
+// ============================================================================
+// PHASE 2: EXTENDED STUDENT PROFILE
+// ============================================================================
+
+// Academic Information
+model University {
+  universityId String @id @default(cuid())
+  name         String @unique
+  location     String?
+  website      String?
+  createdAt    DateTime @default(now())
+
+  // Relationships
+  studentProfiles StudentProfile[]
+
+  @@map("universities")
+}
+
+model Degree {
+  degreeId  String @id @default(cuid())
+  name      String @unique
+  level     String // Bachelor, Master, PhD, etc.
+  createdAt DateTime @default(now())
+
+  // Relationships
+  studentProfiles StudentProfile[]
+
+  @@map("degrees")
+}
+
+model Major {
+  majorId   String @id @default(cuid())
+  name      String @unique
+  field     String // Engineering, Business, etc.
+  createdAt DateTime @default(now())
+
+  // Relationships
+  studentProfiles StudentProfile[]
+
+  @@map("majors")
+}
+
+model Course {
+  courseId    String @id @default(cuid())
+  courseCode  String @unique
+  courseName  String
+  credits     Int?
+  description String?
+  createdAt   DateTime @default(now())
+
+  // Relationships
+  studentCourses StudentCourse[]
+
+  @@map("courses")
+}
+
+// Skills & Technologies
+model Skill {
+  skillId     String @id @default(cuid())
+  name        String @unique
+  category    String // Programming, Design, Business, etc.
+  description String?
+  createdAt   DateTime @default(now())
+
+  // Relationships
+  studentSkills           StudentSkill[]
+  opportunitySkills       OpportunitySkill[]
+  experienceTechnologies  ExperienceTechnology[]
+  projectTechnologies     ProjectTechnology[]
+
+  @@map("skills")
+}
+
+// Preferences
+model Preference {
+  preferenceId String         @id @default(cuid())
+  type         PreferenceType
+  value        String
+  description  String?
+  createdAt    DateTime       @default(now())
+
+  // Relationships
+  studentPreferences StudentPreference[]
+
+  @@map("preferences")
+}
+
+// ============================================================================
+// EXTENDED STUDENT PROFILE
+// ============================================================================
+
+model StudentProfile {
+  studentProfileId      String    @id @default(cuid())
+  studentId             String    @unique
+  universityId          String?
+  degreeId              String?
+  majorId               String?
+  gpa                   Float?
+  graduationDate        DateTime?
+  availabilityStartDate DateTime?
+  attachmentDuration    Int?      // in months
+  willingToRelocate     Boolean   @default(false)
+  remoteAllowed         Boolean   @default(true)
+  cvFilePath            String?
+  transcriptFilePath    String?
+  cvParsedText          String?   @db.Text
+  transcriptParsedText  String?   @db.Text
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  // Relationships
+  student    Student     @relation(fields: [studentId], references: [studentId], onDelete: Cascade)
+  university University? @relation(fields: [universityId], references: [universityId])
+  degree     Degree?     @relation(fields: [degreeId], references: [degreeId])
+  major      Major?      @relation(fields: [majorId], references: [majorId])
+
+  @@map("student_profiles")
+}
+
+model StudentSkill {
+  studentId        String
+  skillId          String
+  proficiency      Int     @default(1) // 1-5 scale
+  yearsOfExperience Float?
+  verified         Boolean @default(false)
+  createdAt        DateTime @default(now())
+
+  // Relationships
+  student Student @relation(fields: [studentId], references: [studentId], onDelete: Cascade)
+  skill   Skill   @relation(fields: [skillId], references: [skillId], onDelete: Cascade)
+
+  @@id([studentId, skillId])
+  @@map("student_skills")
+}
+
+model StudentCourse {
+  studentId String
+  courseId  String
+  grade     String?
+  semester  String?
+  year      Int?
+  createdAt DateTime @default(now())
+
+  // Relationships
+  student Student @relation(fields: [studentId], references: [studentId], onDelete: Cascade)
+  course  Course  @relation(fields: [courseId], references: [courseId], onDelete: Cascade)
+
+  @@id([studentId, courseId])
+  @@map("student_courses")
+}
+
+model StudentPreference {
+  studentId    String
+  preferenceId String
+  priority     Int     @default(1) // 1-5 scale
+  createdAt    DateTime @default(now())
+
+  // Relationships
+  student    Student    @relation(fields: [studentId], references: [studentId], onDelete: Cascade)
+  preference Preference @relation(fields: [preferenceId], references: [preferenceId], onDelete: Cascade)
+
+  @@id([studentId, preferenceId])
+  @@map("student_preferences")
+}
+
+// Experience & Projects
+model Experience {
+  experienceId   String         @id @default(cuid())
+  studentId      String
+  jobTitle       String
+  company        String
+  startDate      DateTime
+  endDate        DateTime?
+  role           String?        @db.Text
+  employmentType EmploymentType
+  description    String?        @db.Text
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  // Relationships
+  student                Student                @relation(fields: [studentId], references: [studentId], onDelete: Cascade)
+  experienceTechnologies ExperienceTechnology[]
+
+  @@map("experiences")
+}
+
+model ExperienceTechnology {
+  experienceId String
+  skillId      String
+  createdAt    DateTime @default(now())
+
+  // Relationships
+  experience Experience @relation(fields: [experienceId], references: [experienceId], onDelete: Cascade)
+  skill      Skill      @relation(fields: [skillId], references: [skillId], onDelete: Cascade)
+
+  @@id([experienceId, skillId])
+  @@map("experience_technologies")
+}
+
+model Project {
+  projectId   String  @id @default(cuid())
+  studentId   String
+  projectName String
+  description String? @db.Text
+  projectType String? // Personal, Academic, Professional
+  startDate   DateTime?
+  endDate     DateTime?
+  githubUrl   String?
+  liveUrl     String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relationships
+  student             Student             @relation(fields: [studentId], references: [studentId], onDelete: Cascade)
+  projectTechnologies ProjectTechnology[]
+
+  @@map("projects")
+}
+
+model ProjectTechnology {
+  projectId String
+  skillId   String
+  createdAt DateTime @default(now())
+
+  // Relationships
+  project Project @relation(fields: [projectId], references: [projectId], onDelete: Cascade)
+  skill   Skill   @relation(fields: [skillId], references: [skillId], onDelete: Cascade)
+
+  @@id([projectId, skillId])
+  @@map("project_technologies")
+}
+
+// ============================================================================
+// EXTENDED COMPANY PROFILE
+// ============================================================================
+
+model CompanyProfile {
+  companyProfileId String   @id @default(cuid())
+  companyId        String   @unique
+  phone            String?
+  employeeCount    String?  // "1-10", "11-50", etc.
+  foundedYear      Int?
+  headquarters     String?
+  companyType      String?  // Startup, Enterprise, etc.
+  benefits         String[] // Array of benefits
+  culture          String?  @db.Text
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  // Relationships
+  company Company @relation(fields: [companyId], references: [companyId], onDelete: Cascade)
+
+  @@map("company_profiles")
+}
+
+model CompanyUser {
+  companyUserId String          @id @default(cuid())
+  companyId     String
+  userId        String
+  role          CompanyUserRole @default(RECRUITER)
+  status        UserStatus      @default(ACTIVE)
+  invitedBy     String?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  // Relationships
+  company Company @relation(fields: [companyId], references: [companyId], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [userId], onDelete: Cascade)
+
+  @@unique([companyId, userId])
+  @@map("company_users")
+}
+
+// ============================================================================
+// OPPORTUNITIES & APPLICATIONS
+// ============================================================================
+
+model Opportunity {
+  opportunityId   String            @id @default(cuid())
+  companyId       String
+  title           String
+  description     String            @db.Text
+  location        String?
+  industry        String?
+  jobTypes        EmploymentType[]  // Array of job types
+  gpaThreshold    Float?
+  isTechnical     Boolean           @default(true)
+  startDate       DateTime?
+  endDate         DateTime?
+  applicationDeadline DateTime?
+  status          OpportunityStatus @default(DRAFT)
+  salaryMin       Int?
+  salaryMax       Int?
+  currency        String?           @default("USD")
+  benefits        String[]          // Array of benefits
+  requirements    String?           @db.Text
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  // Relationships
+  company           Company           @relation(fields: [companyId], references: [companyId], onDelete: Cascade)
+  opportunitySkills OpportunitySkill[]
+  applications      Application[]
+
+  @@map("opportunities")
+}
+
+model OpportunitySkill {
+  opportunityId String
+  skillId       String
+  skillWeight   Int     @default(1) // 1-5 importance scale
+  required      Boolean @default(false)
+  createdAt     DateTime @default(now())
+
+  // Relationships
+  opportunity Opportunity @relation(fields: [opportunityId], references: [opportunityId], onDelete: Cascade)
+  skill       Skill       @relation(fields: [skillId], references: [skillId], onDelete: Cascade)
+
+  @@id([opportunityId, skillId])
+  @@map("opportunity_skills")
+}
+
+// ============================================================================
+// APPLICATION & PLACEMENT WORKFLOW
+// ============================================================================
+
+model Application {
+  applicationId String            @id @default(cuid())
+  studentId     String
+  opportunityId String
+  status        ApplicationStatus @default(SUBMITTED)
+  coverLetter   String?           @db.Text
+  appliedAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+  reviewedBy    String?           // Admin/Company user who reviewed
+  reviewNotes   String?           @db.Text
+  matchScore    Float?            // AI-generated match score
+
+  // Relationships
+  student     Student     @relation(fields: [studentId], references: [studentId], onDelete: Cascade)
+  opportunity Opportunity @relation(fields: [opportunityId], references: [opportunityId], onDelete: Cascade)
+  interviews  Interview[]
+  placement   Placement?
+
+  @@unique([studentId, opportunityId])
+  @@map("applications")
+}
+
+model Interview {
+  interviewId   String          @id @default(cuid())
+  applicationId String
+  interviewType InterviewType
+  scheduledDate DateTime
+  scheduledTime String?
+  duration      Int?            // in minutes
+  interviewer   String?
+  interviewerEmail String?
+  meetingLink   String?
+  location      String?
+  status        InterviewStatus @default(SCHEDULED)
+  feedback      String?         @db.Text
+  rating        Int?            // 1-5 scale
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  // Relationships
+  application Application @relation(fields: [applicationId], references: [applicationId], onDelete: Cascade)
+
+  @@map("interviews")
+}
+
+model Placement {
+  placementId   String          @id @default(cuid())
+  applicationId String          @unique
+  startDate     DateTime
+  endDate       DateTime?
+  status        PlacementStatus @default(ACTIVE)
+  salary        Int?
+  currency      String?         @default("USD")
+  feedback      String?         @db.Text
+  rating        Int?            // 1-5 scale from student
+  companyRating Int?            // 1-5 scale from company
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  // Relationships
+  application Application @relation(fields: [applicationId], references: [applicationId], onDelete: Cascade)
+
+  @@map("placements")
+}
+
+// ============================================================================
+// SYSTEM & SUPPORT TABLES
+// ============================================================================
+
+model Notification {
+  notificationId String           @id @default(cuid())
+  userId         String
+  type           NotificationType
+  title          String
+  message        String           @db.Text
+  read           Boolean          @default(false)
+  actionUrl      String?
+  metadata       Json?            // Additional data as JSON
+  createdAt      DateTime         @default(now())
+  readAt         DateTime?
+
+  // Relationships
+  user User @relation(fields: [userId], references: [userId], onDelete: Cascade)
+
+  @@map("notifications")
+}
+
+model SystemLog {
+  logId     String   @id @default(cuid())
+  userId    String?
+  level     LogLevel @default(INFO)
+  action    String
+  details   String?  @db.Text
+  metadata  Json?    // Additional data as JSON
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  // Relationships
+  user User? @relation(fields: [userId], references: [userId], onDelete: SetNull)
+
+  @@map("system_logs")
+}
+
+model Queue {
+  queueId     String      @id @default(cuid())
+  taskType    String
+  status      QueueStatus @default(PENDING)
+  payload     Json        // Task data as JSON
+  priority    Int         @default(0)
+  attempts    Int         @default(0)
+  maxAttempts Int         @default(3)
+  error       String?     @db.Text
+  createdAt   DateTime    @default(now())
+  processedAt DateTime?
+  completedAt DateTime?
+
+  @@map("queues")
+}
+
+// ============================================================================
+// PHASE 3: STUDENT METRICS & COMPUTED SCORES
+// ============================================================================
+
+model StudentMetrics {
+  studentMetricsId String   @id @default(cuid())
+  studentId        String   @unique
+  skillScore       Float    @default(0)
+  academicScore    Float    @default(0)
+  experienceScore  Float    @default(0)
+  preferenceScore  Float    @default(0)
+  hireabilityScore Float    @default(0)
+  lastComputed     DateTime @default(now())
+  computeVersion   String   @default("1.0")
+  metadata         Json?    // Additional scoring metadata
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  // Relationships
+  student Student @relation(fields: [studentId], references: [studentId], onDelete: Cascade)
+
+  @@map("student_metrics")
+}
+
+// File uploads and document parsing
+model StudentDocument {
+  documentId   String      @id @default(cuid())
+  studentId    String
+  documentType DocumentType
+  fileName     String
+  filePath     String
+  fileSize     Int
+  mimeType     String
+  parsedText   String?     @db.Text
+  parseStatus  ParseStatus @default(PENDING)
+  parseError   String?     @db.Text
+  uploadedAt   DateTime    @default(now())
+  parsedAt     DateTime?
+
+  // Relationships
+  student Student @relation(fields: [studentId], references: [studentId], onDelete: Cascade)
+
+  @@map("student_documents")
+}
+
+enum DocumentType {
+  CV
+  TRANSCRIPT
+  COVER_LETTER
+  PORTFOLIO
+  CERTIFICATE
+}
+
+enum ParseStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+// ============================================================================
+// RELATIONSHIP UPDATES FOR EXISTING MODELS
+// ============================================================================
