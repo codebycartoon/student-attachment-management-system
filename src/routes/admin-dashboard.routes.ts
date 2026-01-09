@@ -8,13 +8,17 @@ import {
   getOpportunityApprovalRates,
   getPendingApprovals,
   getRecentActivity,
+  getAdminAnalytics,
+  getAdminNotifications,
+  markAdminNotificationRead,
+  sendSystemAlert,
 } from '../controllers/admin-dashboard.controller';
 
 const router = Router();
 
 // Apply authentication and admin role requirement to all routes
 router.use(authenticateToken);
-router.use(requireRole(['ADMIN']));
+router.use(requireRole('ADMIN'));
 
 // ============================================================================
 // DASHBOARD OVERVIEW ROUTES
@@ -75,5 +79,33 @@ router.get('/analytics/session-trends', getActiveSessionsTrends);
  * @query timeframe (1month, 3months, 6months, 12months)
  */
 router.get('/analytics/opportunity-approvals', getOpportunityApprovalRates);
+
+/**
+ * @route GET /admin/dashboard/analytics
+ * @desc Get comprehensive admin analytics
+ * @access Admin only
+ */
+router.get('/analytics', getAdminAnalytics);
+
+/**
+ * @route GET /admin/dashboard/notifications
+ * @desc Get admin notifications
+ * @access Admin only
+ */
+router.get('/notifications', getAdminNotifications);
+
+/**
+ * @route PATCH /admin/dashboard/notifications/:notificationId/read
+ * @desc Mark admin notification as read
+ * @access Admin only
+ */
+router.patch('/notifications/:notificationId/read', markAdminNotificationRead);
+
+/**
+ * @route POST /admin/dashboard/system-alert
+ * @desc Send system alert to all admins
+ * @access Admin only
+ */
+router.post('/system-alert', sendSystemAlert);
 
 export default router;

@@ -42,13 +42,17 @@
     "phase2:setup": "npm run prisma:migrate && npm run prisma:generate && ts-node scripts/seed-phase2.ts",
     "phase2:dev": "npm run phase2:setup && npm run dev",
     "phase2:seed": "ts-node scripts/seed-phase2.ts",
-    "phase3:setup": "npm run prisma:migrate && npm run prisma:generate && ts-node scripts/seed-phase2.ts && ts-node scripts/seed-phase3.ts",
+    "phase3:setup": "npm run prisma:migrate && npm run prisma:generate && npm run seed:reference && ts-node scripts/seed-phase2.ts && ts-node scripts/seed-phase3.ts",
     "phase3:dev": "npm run phase3:setup && npm run dev",
     "phase3:seed": "ts-node scripts/seed-phase3.ts",
+    "seed:reference": "ts-node scripts/seed-reference-data.ts",
     "models:generate": "npm run prisma:generate"
   },
   "dependencies": {
     "@prisma/client": "^5.7.1",
+    "@types/axios": "^0.9.36",
+    "@types/socket.io": "^3.0.1",
+    "axios": "^1.13.2",
     "bcryptjs": "^2.4.3",
     "bull": "^4.12.2",
     "compression": "^1.7.4",
@@ -64,6 +68,8 @@
     "multer": "^1.4.5-lts.1",
     "pdf-parse": "^1.1.1",
     "redis": "^4.6.12",
+    "socket.io": "^4.8.3",
+    "socket.io-client": "^4.8.3",
     "winston": "^3.11.0",
     "zod": "^3.22.4"
   },

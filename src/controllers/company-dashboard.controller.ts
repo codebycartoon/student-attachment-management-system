@@ -3,6 +3,8 @@ import { PrismaClient } from '@prisma/client';
 import { z } from 'zod';
 import { logger } from '../config/logger';
 import { matchService } from '../services/match.service';
+import { notificationService } from '../services/notification.service';
+import { dashboardAnalyticsService } from '../services/dashboard-analytics.service';
 
 const prisma = new PrismaClient();
 
@@ -49,6 +51,9 @@ export const getCompanyDashboard = async (req: Request, res: Response) => {
     if (!company) {
       return res.status(404).json({ error: 'Company not found' });
     }
+
+    // Get comprehensive analytics
+    const analytics = await dashboardAnalyticsService.getCompanyAnalytics(companyId);
 
     // Get dashboard metrics
     const [
@@ -190,6 +195,10 @@ export const getCompanyDashboard = async (req: Request, res: Response) => {
       take: 5,
     });
 
+    // Get notifications for company user
+    const notifications = await notificationService.getUserNotifications(company.userId, 10);
+    const notificationCount = await notificationService.getNotificationCount(company.userId);
+
     res.json({
       company: {
         companyId,
@@ -203,12 +212,17 @@ export const getCompanyDashboard = async (req: Request, res: Response) => {
         recentPlacements,
         candidatePoolSize: candidateStats,
       },
+      analytics,
       applicationsByStatus: applicationsByStatus.reduce((acc, item) => {
         acc[item.status.toLowerCase()] = item._count;
         return acc;
       }, {} as Record<string, number>),
       recentApplications,
       upcomingInterviews,
+      notifications: {
+        recent: notifications,
+        count: notificationCount
+      }
     });
   } catch (error) {
     logger.error('Error fetching company dashboard:', error);
@@ -652,14 +666,16 @@ export const performBulkAction = async (req: Request, res: Response) => {
 // UTILITY FUNCTIONS
 // ============================================================================
 
-function getSortOrder(sortBy: string, sortOrder: string) {
+function getSortOrder(sortBy: string, sortOrder: string): any {
+  const order = sortOrder as 'asc' | 'desc';
+  
   switch (sortBy) {
     case 'hireabilityScore':
-      return { metrics: { hireabilityScore: sortOrder } };
+      return { metrics: { hireabilityScore: order } };
     case 'gpa':
-      return { profile: { gpa: sortOrder } };
+      return { profile: { gpa: order } };
     case 'graduationDate':
-      return { profile: { graduationDate: sortOrder } };
+      return { profile: { graduationDate: order } };
     case 'relevance':
     default:
       return { metrics: { hireabilityScore: 'desc' } };
@@ -704,3 +720,94 @@ function calculateProfileCompletion(student: any): number {
 
   return Math.min(score, maxScore);
 }
+
+/**
+ * Get company analytics
+ */
+export const getCompanyAnalytics = async (req: Request, res: Response) => {
+  try {
+    const { id: companyId } = req.params;
+
+    // Verify company access
+    const company = await prisma.company.findUnique({
+      where: { companyId },
+      select: { userId: true },
+    });
+
+    if (!company) {
+      return res.status(404).json({ error: 'Company not found' });
+    }
+
+    const analytics = await dashboardAnalyticsService.getCompanyAnalytics(companyId);
+
+    res.json(analytics);
+  } catch (error) {
+    logger.error('Error fetching company analytics:', error);
+    res.status(500).json({ error: 'Failed to fetch company analytics' });
+  }
+};
+
+/**
+ * Get company notifications
+ */
+export const getCompanyNotifications = async (req: Request, res: Response) => {
+  try {
+    const { id: companyId } = req.params;
+    const { limit = 20, unreadOnly = false } = req.query;
+
+    // Verify company access
+    const company = await prisma.company.findUnique({
+      where: { companyId },
+      select: { userId: true },
+    });
+
+    if (!company) {
+      return res.status(404).json({ error: 'Company not found' });
+    }
+
+    const notifications = await notificationService.getUserNotifications(
+      company.userId, 
+      Number(limit), 
+      unreadOnly === 'true'
+    );
+
+    const count = await notificationService.getNotificationCount(company.userId);
+
+    res.json({
+      notifications,
+      count
+    });
+  } catch (error) {
+    logger.error('Error fetching company notifications:', error);
+    res.status(500).json({ error: 'Failed to fetch notifications' });
+  }
+};
+
+/**
+ * Mark company notification as read
+ */
+export const markCompanyNotificationRead = async (req: Request, res: Response) => {
+  try {
+    const { id: companyId, notificationId } = req.params;
+
+    // Verify company access
+    const company = await prisma.company.findUnique({
+      where: { companyId },
+      select: { userId: true },
+    });
+
+    if (!company) {
+      return res.status(404).json({ error: 'Company not found' });
+    }
+
+    await notificationService.markAsRead(notificationId, company.userId);
+
+    res.json({
+      success: true,
+      message: 'Notification marked as read'
+    });
+  } catch (error) {
+    logger.error('Error marking company notification as read:', error);
+    res.status(500).json({ error: 'Failed to mark notification as read' });
+  }
+};

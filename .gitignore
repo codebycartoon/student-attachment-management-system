@@ -103,7 +103,17 @@ Thumbs.db
 # Uploads
 uploads/
 
-# Test files
+# Test files and development utilities
 test-*.json
 test-*.ts
 test-*.js
+cleanup-test-data.ts
+*_SUMMARY.md
+MILESTONE*.md
+PHASE*.md
+
+# Development and testing directories
+tests/
+coverage/
+logs/
+dist/

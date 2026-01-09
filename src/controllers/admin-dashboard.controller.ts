@@ -1,6 +1,8 @@
 import { Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { logger } from '../config/logger';
+import { notificationService } from '../services/notification.service';
+import { dashboardAnalyticsService } from '../services/dashboard-analytics.service';
 
 const prisma = new PrismaClient();
 
@@ -10,9 +12,16 @@ const prisma = new PrismaClient();
 
 export const getDashboardOverview = async (req: Request, res: Response) => {
   try {
+    if (!req.user) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
     const now = new Date();
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
     const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+    // Get comprehensive analytics
+    const analytics = await dashboardAnalyticsService.getAdminAnalytics();
 
     // System Users Card
     const [
@@ -119,8 +128,8 @@ export const getDashboardOverview = async (req: Request, res: Response) => {
       prisma.userSession.count({
         where: { expiresAt: { gt: now } },
       }),
-      prisma.queue.count({ where: { status: 'PENDING' } }),
-      prisma.queue.count({ where: { status: 'FAILED' } }),
+      prisma.recomputationQueue.count({ where: { status: 'PENDING' } }),
+      prisma.recomputationQueue.count({ where: { status: 'FAILED' } }),
       prisma.systemLog.count({
         where: {
           level: 'ERROR',
@@ -136,6 +145,10 @@ export const getDashboardOverview = async (req: Request, res: Response) => {
         WHERE action IN ('LOGIN', 'API_REQUEST', 'DATA_ACCESS')
       `,
     ]);
+
+    // Get admin notifications
+    const notifications = await notificationService.getUserNotifications(req.user.userId, 10);
+    const notificationCount = await notificationService.getNotificationCount(req.user.userId);
 
     res.json({
       cards: {
@@ -200,6 +213,11 @@ export const getDashboardOverview = async (req: Request, res: Response) => {
           load: systemLoad,
         },
       },
+      analytics,
+      notifications: {
+        recent: notifications,
+        count: notificationCount
+      }
     });
   } catch (error) {
     logger.error('Error fetching dashboard overview:', error);
@@ -578,5 +596,93 @@ export const getRecentActivity = async (req: Request, res: Response) => {
   } catch (error) {
     logger.error('Error fetching recent activity:', error);
     res.status(500).json({ error: 'Failed to fetch recent activity' });
+  }
+};
+
+/**
+ * Get admin analytics
+ */
+export const getAdminAnalytics = async (req: Request, res: Response) => {
+  try {
+    const analytics = await dashboardAnalyticsService.getAdminAnalytics();
+    res.json(analytics);
+  } catch (error) {
+    logger.error('Error fetching admin analytics:', error);
+    res.status(500).json({ error: 'Failed to fetch admin analytics' });
+  }
+};
+
+/**
+ * Get admin notifications
+ */
+export const getAdminNotifications = async (req: Request, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    const { limit = 20, unreadOnly = false } = req.query;
+    
+    const notifications = await notificationService.getUserNotifications(
+      req.user.userId, 
+      Number(limit), 
+      unreadOnly === 'true'
+    );
+
+    const count = await notificationService.getNotificationCount(req.user.userId);
+
+    res.json({
+      notifications,
+      count
+    });
+  } catch (error) {
+    logger.error('Error fetching admin notifications:', error);
+    res.status(500).json({ error: 'Failed to fetch notifications' });
+  }
+};
+
+/**
+ * Mark admin notification as read
+ */
+export const markAdminNotificationRead = async (req: Request, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    const { notificationId } = req.params;
+    
+    await notificationService.markAsRead(notificationId, req.user.userId);
+
+    res.json({
+      success: true,
+      message: 'Notification marked as read'
+    });
+  } catch (error) {
+    logger.error('Error marking admin notification as read:', error);
+    res.status(500).json({ error: 'Failed to mark notification as read' });
+  }
+};
+
+/**
+ * Send system alert
+ */
+export const sendSystemAlert = async (req: Request, res: Response) => {
+  try {
+    const { title, message, metadata } = req.body;
+
+    if (!title || !message) {
+      return res.status(400).json({ error: 'Title and message are required' });
+    }
+
+    await notificationService.notifySystemAlert(title, message, metadata);
+
+    res.json({
+      success: true,
+      message: 'System alert sent to all admins'
+    });
+  } catch (error) {
+    logger.error('Error sending system alert:', error);
+    res.status(500).json({ error: 'Failed to send system alert' });
   }
 };

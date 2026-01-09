@@ -1,428 +1,455 @@
+/**
+ * Interview Controller
+ * Handles interview scheduling, management, and tracking
+ */
+
 import { Request, Response } from 'express';
 import { z } from 'zod';
-import { logger } from '../config/logger';
 import { interviewService } from '../services/interview.service';
-import { companyService } from '../services/company.service';
-import { applicationService } from '../services/application.service';
-import { opportunityService } from '../services/opportunity.service';
+import { InterviewType, InterviewStatus } from '@prisma/client';
 
-// ============================================================================
-// VALIDATION SCHEMAS
-// ============================================================================
-
+// Validation schemas
 const scheduleInterviewSchema = z.object({
-  applicationId: z.string(),
+  applicationId: z.string().cuid(),
   interviewType: z.enum(['ONLINE', 'ONSITE', 'PHONE', 'VIDEO']),
   scheduledDate: z.string().datetime(),
-  scheduledTime: z.string().optional(),
+  scheduledTime: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/).optional(),
   duration: z.number().min(15).max(480).optional(), // 15 minutes to 8 hours
-  interviewer: z.string().optional(),
+  interviewer: z.string().max(100).optional(),
   interviewerEmail: z.string().email().optional(),
   meetingLink: z.string().url().optional(),
-  location: z.string().optional(),
+  location: z.string().max(200).optional()
 });
 
 const updateInterviewSchema = z.object({
   scheduledDate: z.string().datetime().optional(),
-  scheduledTime: z.string().optional(),
+  scheduledTime: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/).optional(),
   duration: z.number().min(15).max(480).optional(),
-  interviewer: z.string().optional(),
+  interviewer: z.string().max(100).optional(),
   interviewerEmail: z.string().email().optional(),
   meetingLink: z.string().url().optional(),
-  location: z.string().optional(),
+  location: z.string().max(200).optional(),
   status: z.enum(['SCHEDULED', 'COMPLETED', 'CANCELLED', 'NO_SHOW']).optional(),
+  feedback: z.string().max(1000).optional(),
+  rating: z.number().min(1).max(5).optional()
 });
-
-const addFeedbackSchema = z.object({
-  feedback: z.string().min(10),
-  rating: z.number().min(1).max(5).optional(),
-});
-
-const interviewFiltersSchema = z.object({
-  status: z.enum(['SCHEDULED', 'COMPLETED', 'CANCELLED', 'NO_SHOW']).optional(),
-  interviewType: z.enum(['ONLINE', 'ONSITE', 'PHONE', 'VIDEO']).optional(),
-  dateFrom: z.string().datetime().optional(),
-  dateTo: z.string().datetime().optional(),
-  interviewer: z.string().optional(),
-  page: z.number().min(1).optional(),
-  limit: z.number().min(1).max(100).optional(),
-});
-
-// ============================================================================
-// INTERVIEW MANAGEMENT CONTROLLERS
-// ============================================================================
 
 /**
- * Schedule new interview
- * POST /api/v1/company/interviews
+ * Schedule a new interview
  */
 export const scheduleInterview = async (req: Request, res: Response) => {
   try {
-    const userId = req.user!.userId;
+    if (!req.user) {
+      return res.status(401).json({
+        success: false,
+        message: 'Authentication required'
+      });
+    }
+
+    // Only companies and admins can schedule interviews
+    if (req.user.role !== 'COMPANY' && req.user.role !== 'ADMIN') {
+      return res.status(403).json({
+        success: false,
+        message: 'Only companies can schedule interviews'
+      });
+    }
+
     const validatedData = scheduleInterviewSchema.parse(req.body);
 
-    // Find company for this user
-    const company = await companyService.getCompanyByUserId(userId);
-    
-    if (!company) {
-      return res.status(404).json({ error: 'Company not found' });
-    }
-
-    // Verify user has permission to schedule interviews
-    const userRole = await companyService.getCompanyRole(company.companyId, userId);
-    if (userRole !== 'OWNER' && userRole !== 'ADMIN' && userRole !== 'MANAGER' && userRole !== 'RECRUITER') {
-      return res.status(403).json({ error: 'Insufficient permissions' });
-    }
-
-    // Verify application belongs to company
-    const application = await applicationService.getApplication(validatedData.applicationId);
-    const isOwner = await opportunityService.verifyOpportunityOwnership(
-      application.opportunityId, 
-      company.companyId
-    );
-    if (!isOwner) {
-      return res.status(403).json({ error: 'Access denied' });
-    }
-
-    const interviewData = {
+    const interview = await interviewService.scheduleInterview({
       ...validatedData,
-      scheduledDate: new Date(validatedData.scheduledDate),
-    };
-
-    const interview = await interviewService.scheduleInterview(interviewData, userId);
+      scheduledDate: new Date(validatedData.scheduledDate)
+    });
 
     res.status(201).json({
       success: true,
-      data: interview,
       message: 'Interview scheduled successfully',
+      data: interview
     });
-  } catch (error) {
+
+  } catch (error: any) {
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ error: 'Validation failed', details: error.errors });
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid input data',
+        errors: error.errors
+      });
     }
-    logger.error('Error scheduling interview:', error);
-    res.status(500).json({ error: 'Failed to schedule interview' });
-  }
-};
 
-/**
- * Get company interviews
- * GET /api/v1/company/interviews
- */
-export const getCompanyInterviews = async (req: Request, res: Response) => {
-  try {
-    const userId = req.user!.userId;
-    
-    // Parse and validate query parameters
-    const filters = interviewFiltersSchema.parse({
-      status: req.query.status,
-      interviewType: req.query.interviewType,
-      dateFrom: req.query.dateFrom,
-      dateTo: req.query.dateTo,
-      interviewer: req.query.interviewer,
-      page: req.query.page ? parseInt(req.query.page as string) : undefined,
-      limit: req.query.limit ? parseInt(req.query.limit as string) : undefined,
+    console.error('Schedule interview error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to schedule interview'
     });
-
-    // Convert date strings to Date objects
-    const processedFilters = {
-      ...filters,
-      ...(filters.dateFrom && { dateFrom: new Date(filters.dateFrom) }),
-      ...(filters.dateTo && { dateTo: new Date(filters.dateTo) }),
-    };
-
-    // Find company for this user
-    const company = await companyService.getCompanyByUserId(userId);
-    
-    if (!company) {
-      return res.status(404).json({ error: 'Company not found' });
-    }
-
-    // Verify access
-    const hasAccess = await companyService.verifyCompanyAccess(company.companyId, userId);
-    if (!hasAccess) {
-      return res.status(403).json({ error: 'Access denied' });
-    }
-
-    const result = await interviewService.getCompanyInterviews(company.companyId, processedFilters);
-
-    res.json({
-      success: true,
-      data: result,
-    });
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return res.status(400).json({ error: 'Invalid filters', details: error.errors });
-    }
-    logger.error('Error fetching company interviews:', error);
-    res.status(500).json({ error: 'Failed to fetch interviews' });
-  }
-};
-
-/**
- * Get single interview details
- * GET /api/v1/company/interviews/:interviewId
- */
-export const getInterview = async (req: Request, res: Response) => {
-  try {
-    const userId = req.user!.userId;
-    const { interviewId } = req.params;
-
-    // Find company for this user
-    const company = await companyService.getCompanyByUserId(userId);
-    
-    if (!company) {
-      return res.status(404).json({ error: 'Company not found' });
-    }
-
-    const interview = await interviewService.getInterview(interviewId);
-
-    // Verify interview belongs to company
-    const isOwner = await opportunityService.verifyOpportunityOwnership(
-      interview.application.opportunityId, 
-      company.companyId
-    );
-    if (!isOwner) {
-      return res.status(403).json({ error: 'Access denied' });
-    }
-
-    res.json({
-      success: true,
-      data: interview,
-    });
-  } catch (error) {
-    logger.error('Error fetching interview:', error);
-    res.status(500).json({ error: 'Failed to fetch interview' });
   }
 };
 
 /**
  * Update interview details
- * PUT /api/v1/company/interviews/:interviewId
  */
 export const updateInterview = async (req: Request, res: Response) => {
   try {
-    const userId = req.user!.userId;
+    if (!req.user) {
+      return res.status(401).json({
+        success: false,
+        message: 'Authentication required'
+      });
+    }
+
     const { interviewId } = req.params;
     const validatedData = updateInterviewSchema.parse(req.body);
 
-    // Find company for this user
-    const company = await companyService.getCompanyByUserId(userId);
-    
-    if (!company) {
-      return res.status(404).json({ error: 'Company not found' });
-    }
-
-    // Verify user has permission to update interviews
-    const userRole = await companyService.getCompanyRole(company.companyId, userId);
-    if (userRole !== 'OWNER' && userRole !== 'ADMIN' && userRole !== 'MANAGER' && userRole !== 'RECRUITER') {
-      return res.status(403).json({ error: 'Insufficient permissions' });
-    }
-
-    // Get interview to verify ownership
-    const interview = await interviewService.getInterview(interviewId);
-    const isOwner = await opportunityService.verifyOpportunityOwnership(
-      interview.application.opportunityId, 
-      company.companyId
-    );
-    if (!isOwner) {
-      return res.status(403).json({ error: 'Access denied' });
-    }
-
     const updateData = {
       ...validatedData,
-      ...(validatedData.scheduledDate && {
-        scheduledDate: new Date(validatedData.scheduledDate),
-      }),
+      ...(validatedData.scheduledDate && { scheduledDate: new Date(validatedData.scheduledDate) })
     };
 
-    const updatedInterview = await interviewService.updateInterview(interviewId, updateData);
+    const interview = await interviewService.updateInterview(interviewId, updateData);
 
     res.json({
       success: true,
-      data: updatedInterview,
       message: 'Interview updated successfully',
+      data: interview
     });
-  } catch (error) {
+
+  } catch (error: any) {
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ error: 'Validation failed', details: error.errors });
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid input data',
+        errors: error.errors
+      });
     }
-    logger.error('Error updating interview:', error);
-    res.status(500).json({ error: 'Failed to update interview' });
+
+    console.error('Update interview error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to update interview'
+    });
   }
 };
 
 /**
  * Cancel interview
- * POST /api/v1/company/interviews/:interviewId/cancel
  */
 export const cancelInterview = async (req: Request, res: Response) => {
   try {
-    const userId = req.user!.userId;
+    if (!req.user) {
+      return res.status(401).json({
+        success: false,
+        message: 'Authentication required'
+      });
+    }
+
     const { interviewId } = req.params;
     const { reason } = req.body;
 
-    // Find company for this user
-    const company = await companyService.getCompanyByUserId(userId);
-    
-    if (!company) {
-      return res.status(404).json({ error: 'Company not found' });
-    }
-
-    // Verify user has permission to cancel interviews
-    const userRole = await companyService.getCompanyRole(company.companyId, userId);
-    if (userRole !== 'OWNER' && userRole !== 'ADMIN' && userRole !== 'MANAGER' && userRole !== 'RECRUITER') {
-      return res.status(403).json({ error: 'Insufficient permissions' });
-    }
-
-    // Get interview to verify ownership
-    const interview = await interviewService.getInterview(interviewId);
-    const isOwner = await opportunityService.verifyOpportunityOwnership(
-      interview.application.opportunityId, 
-      company.companyId
-    );
-    if (!isOwner) {
-      return res.status(403).json({ error: 'Access denied' });
-    }
-
-    const cancelledInterview = await interviewService.cancelInterview(interviewId, reason);
+    const interview = await interviewService.cancelInterview(interviewId, reason);
 
     res.json({
       success: true,
-      data: cancelledInterview,
       message: 'Interview cancelled successfully',
+      data: interview
     });
-  } catch (error) {
-    logger.error('Error cancelling interview:', error);
-    res.status(500).json({ error: 'Failed to cancel interview' });
+
+  } catch (error: any) {
+    console.error('Cancel interview error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to cancel interview'
+    });
   }
 };
 
 /**
- * Add interview feedback
- * POST /api/v1/company/interviews/:interviewId/feedback
+ * Get student interviews
  */
-export const addInterviewFeedback = async (req: Request, res: Response) => {
+export const getStudentInterviews = async (req: Request, res: Response) => {
   try {
-    const userId = req.user!.userId;
+    if (!req.user) {
+      return res.status(401).json({
+        success: false,
+        message: 'Authentication required'
+      });
+    }
+
+    const { studentId } = req.params;
+    const { status } = req.query;
+
+    // Students can only view their own interviews
+    if (req.user.role === 'STUDENT') {
+      const userStudent = await req.prisma?.student.findUnique({
+        where: { userId: req.user.userId }
+      });
+
+      if (!userStudent || userStudent.studentId !== studentId) {
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied'
+        });
+      }
+    }
+
+    const interviews = await interviewService.getStudentInterviews(
+      studentId,
+      status as InterviewStatus
+    );
+
+    res.json({
+      success: true,
+      data: interviews
+    });
+
+  } catch (error: any) {
+    console.error('Get student interviews error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get interviews'
+    });
+  }
+};
+
+/**
+ * Get company interviews
+ */
+export const getCompanyInterviews = async (req: Request, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({
+        success: false,
+        message: 'Authentication required'
+      });
+    }
+
+    const { companyId } = req.params;
+    const { status } = req.query;
+
+    // Companies can only view their own interviews
+    if (req.user.role === 'COMPANY') {
+      const userCompany = await req.prisma?.company.findUnique({
+        where: { userId: req.user.userId }
+      });
+
+      if (!userCompany || userCompany.companyId !== companyId) {
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied'
+        });
+      }
+    }
+
+    const interviews = await interviewService.getCompanyInterviews(
+      companyId,
+      status as InterviewStatus
+    );
+
+    res.json({
+      success: true,
+      data: interviews
+    });
+
+  } catch (error: any) {
+    console.error('Get company interviews error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get interviews'
+    });
+  }
+};
+
+/**
+ * Get interview details
+ */
+export const getInterviewDetails = async (req: Request, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({
+        success: false,
+        message: 'Authentication required'
+      });
+    }
+
     const { interviewId } = req.params;
-    const validatedData = addFeedbackSchema.parse(req.body);
 
-    // Find company for this user
-    const company = await companyService.getCompanyByUserId(userId);
-    
-    if (!company) {
-      return res.status(404).json({ error: 'Company not found' });
+    const interview = await interviewService.getInterviewDetails(interviewId);
+
+    if (!interview) {
+      return res.status(404).json({
+        success: false,
+        message: 'Interview not found'
+      });
     }
 
-    // Verify user has permission to add feedback
-    const userRole = await companyService.getCompanyRole(company.companyId, userId);
-    if (userRole !== 'OWNER' && userRole !== 'ADMIN' && userRole !== 'MANAGER' && userRole !== 'RECRUITER') {
-      return res.status(403).json({ error: 'Insufficient permissions' });
+    // Check access permissions
+    if (req.user.role === 'STUDENT') {
+      if (interview.application.student.userId !== req.user.userId) {
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied'
+        });
+      }
+    } else if (req.user.role === 'COMPANY') {
+      if (interview.application.opportunity.company.userId !== req.user.userId) {
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied'
+        });
+      }
     }
-
-    // Get interview to verify ownership
-    const interview = await interviewService.getInterview(interviewId);
-    const isOwner = await opportunityService.verifyOpportunityOwnership(
-      interview.application.opportunityId, 
-      company.companyId
-    );
-    if (!isOwner) {
-      return res.status(403).json({ error: 'Access denied' });
-    }
-
-    const updatedInterview = await interviewService.addInterviewFeedback(interviewId, validatedData);
 
     res.json({
       success: true,
-      data: updatedInterview,
-      message: 'Interview feedback added successfully',
+      data: interview
     });
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return res.status(400).json({ error: 'Validation failed', details: error.errors });
-    }
-    logger.error('Error adding interview feedback:', error);
-    res.status(500).json({ error: 'Failed to add feedback' });
+
+  } catch (error: any) {
+    console.error('Get interview details error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get interview details'
+    });
   }
 };
 
 /**
- * Get interview statistics for company
- * GET /api/v1/company/interviews/stats
- */
-export const getCompanyInterviewStats = async (req: Request, res: Response) => {
-  try {
-    const userId = req.user!.userId;
-    const { timeframe } = req.query;
-
-    // Find company for this user
-    const company = await companyService.getCompanyByUserId(userId);
-    
-    if (!company) {
-      return res.status(404).json({ error: 'Company not found' });
-    }
-
-    // Verify access
-    const hasAccess = await companyService.verifyCompanyAccess(company.companyId, userId);
-    if (!hasAccess) {
-      return res.status(403).json({ error: 'Access denied' });
-    }
-
-    const stats = await interviewService.getCompanyInterviewStats(
-      company.companyId,
-      timeframe as string
-    );
-
-    res.json({
-      success: true,
-      data: stats,
-    });
-  } catch (error) {
-    logger.error('Error fetching company interview stats:', error);
-    res.status(500).json({ error: 'Failed to fetch interview statistics' });
-  }
-};
-
-/**
- * Get upcoming interviews for company
- * GET /api/v1/company/interviews/upcoming
+ * Get upcoming interviews for current user
  */
 export const getUpcomingInterviews = async (req: Request, res: Response) => {
   try {
-    const userId = req.user!.userId;
-    const { limit = '10' } = req.query;
-
-    // Find company for this user
-    const company = await companyService.getCompanyByUserId(userId);
-    
-    if (!company) {
-      return res.status(404).json({ error: 'Company not found' });
+    if (!req.user) {
+      return res.status(401).json({
+        success: false,
+        message: 'Authentication required'
+      });
     }
 
-    // Verify access
-    const hasAccess = await companyService.verifyCompanyAccess(company.companyId, userId);
-    if (!hasAccess) {
-      return res.status(403).json({ error: 'Access denied' });
-    }
-
-    const filters = {
-      status: 'SCHEDULED' as const,
-      dateFrom: new Date(),
-      limit: parseInt(limit as string),
-    };
-
-    const result = await interviewService.getCompanyInterviews(company.companyId, filters);
+    const interviews = await interviewService.getUpcomingInterviews(
+      req.user.userId,
+      req.user.role
+    );
 
     res.json({
       success: true,
-      data: {
-        interviews: result.interviews,
-        total: result.pagination.total,
-      },
+      data: interviews
     });
-  } catch (error) {
-    logger.error('Error fetching upcoming interviews:', error);
-    res.status(500).json({ error: 'Failed to fetch upcoming interviews' });
+
+  } catch (error: any) {
+    console.error('Get upcoming interviews error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get upcoming interviews'
+    });
+  }
+};
+
+/**
+ * Get interview statistics
+ */
+export const getInterviewStats = async (req: Request, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({
+        success: false,
+        message: 'Authentication required'
+      });
+    }
+
+    let companyId: string | undefined;
+
+    // For company users, get their company ID
+    if (req.user.role === 'COMPANY') {
+      const company = await req.prisma?.company.findUnique({
+        where: { userId: req.user.userId }
+      });
+      companyId = company?.companyId;
+    }
+
+    // For admin, companyId can be passed as query parameter
+    if (req.user.role === 'ADMIN' && req.query.companyId) {
+      companyId = req.query.companyId as string;
+    }
+
+    const stats = await interviewService.getInterviewStats(companyId);
+
+    res.json({
+      success: true,
+      data: stats
+    });
+
+  } catch (error: any) {
+    console.error('Get interview stats error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get interview statistics'
+    });
+  }
+};
+
+/**
+ * Student responds to interview invitation
+ */
+export const respondToInterview = async (req: Request, res: Response) => {
+  try {
+    if (!req.user || req.user.role !== 'STUDENT') {
+      return res.status(403).json({
+        success: false,
+        message: 'Only students can respond to interview invitations'
+      });
+    }
+
+    const { interviewId } = req.params;
+    const { response, message } = req.body; // response: 'accept' | 'decline'
+
+    if (!['accept', 'decline'].includes(response)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Response must be either "accept" or "decline"'
+      });
+    }
+
+    // Get interview details to verify student access
+    const interview = await interviewService.getInterviewDetails(interviewId);
+
+    if (!interview) {
+      return res.status(404).json({
+        success: false,
+        message: 'Interview not found'
+      });
+    }
+
+    if (interview.application.student.userId !== req.user.userId) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied'
+      });
+    }
+
+    if (response === 'decline') {
+      // Cancel the interview if student declines
+      const updatedInterview = await interviewService.cancelInterview(
+        interviewId,
+        message || 'Student declined interview invitation'
+      );
+
+      res.json({
+        success: true,
+        message: 'Interview invitation declined',
+        data: updatedInterview
+      });
+    } else {
+      // If accepting, just send a confirmation (interview remains scheduled)
+      res.json({
+        success: true,
+        message: 'Interview invitation accepted',
+        data: interview
+      });
+    }
+
+  } catch (error: any) {
+    console.error('Respond to interview error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to respond to interview'
+    });
   }
 };
